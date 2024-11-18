@@ -12,24 +12,25 @@ class Reemplazo extends Model
 {
     use HasFactory, AsSource, Filterable, Attachable;
 
-    // Definir la tabla asociada al modelo (si el nombre no es plural)
     protected $table = 'reemplazos';
 
-    // Definir los campos que pueden ser asignados masivamente
     protected $fillable = [
         'id_impresora_original',
         'id_impresora_reemplazo',
         'fecha_reemplazo',
         'fecha_reactivacion',
+        'numero_contrato',       // Nuevo campo para el contrato asociado
+        'contador_inicial', // Nuevo campo para el contador inicial
+        'contador_final',  
     ];
 
-    // Relación con el modelo Impresora (impresora original)
+    // Relación hacia la impresora original
     public function impresoraOriginal()
     {
         return $this->belongsTo(Impresora::class, 'id_impresora_original');
     }
 
-    // Relación con el modelo Impresora (impresora de reemplazo)
+    // Relación hacia la impresora de reemplazo
     public function impresoraReemplazo()
     {
         return $this->belongsTo(Impresora::class, 'id_impresora_reemplazo');

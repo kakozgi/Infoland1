@@ -91,7 +91,7 @@ class PlatformProvider extends OrchidServiceProvider
                  ,   // Título
                // ->permission('platform.impresoras.view'), // Permiso necesario para ver el menú
 
-            Menu::make('Contador Contrato Individual')
+            Menu::make('Minimo Copias Contrato Individual')
                 ->icon('printer')  // Icono del menú
                 ->route('platform.contratos_impresoras')  // La ruta que creamos para listar contratos de impresoras
                 ->divider()  ,   // Título

@@ -2,109 +2,97 @@
 
 namespace App\Orchid\Layouts;
 
-use App\Models\Impresora;
 use Orchid\Screen\TD;
 use Orchid\Screen\Layouts\Table;
-use Orchid\Screen\Actions\Link;
-use Orchid\Screen\Fields\Input;
-
 
 class ImpresoraContadorLayout extends Table
 {
-    public $target = 'impresoras';  // Usamos 'impresoras' que viene del Screen
+    public $target = 'impresoras'; // Esta clave debe coincidir con lo enviado desde el query()
 
     public function columns(): array
     {
         return [
             TD::make('serial', 'Serial Impresora')
-                ->render(function (Impresora $impresora) {
-                    return $impresora->serial;
-                }),
-
-            TD::make('numero_contrato', 'Número Contrato')
-                ->render(function (Impresora $impresora) {
-                    // Si la impresora tiene un contrato, mostramos el número de contrato
-                    return $impresora->contrato ? $impresora->contrato->numero_contrato : 'Sin contrato';
-                })
-             ,
-              
-
-            TD::make('contador_actual', 'Contador Actual')
-                ->render(function (Impresora $impresora) {
-                    return number_format($impresora->contador_actual);
-                }),
-
-            TD::make('ultimo_contador', 'Último Contador')
-                ->render(function (Impresora $impresora) {
-                    $ultimoHistorial = $impresora->ultimoHistorial();
-                    return $ultimoHistorial ? number_format($ultimoHistorial->contador) : 'N/A';
-                }),
-
-            TD::make('diferencia', 'Diferencia')
-                ->render(function (Impresora $impresora) {
-                    $ultimoHistorial = $impresora->ultimoHistorial();
-                    
-                    // Si existe el último historial, calculamos la diferencia
-                    if ($ultimoHistorial) {
-                        $diferencia = $impresora->contador_actual - $ultimoHistorial->contador;
-                        return number_format($diferencia);
+                ->render(function ($item) {
+                    if (!isset($item['serial'])) {
+                        return '<span class="text-danger">Sin datos de impresora</span>';
                     }
 
-                    // Si no hay un historial previo, mostramos 'N/A'
-                    return 'N/A';
+                    $serial = $item['serial'];
+                    $esReemplazo = $item['es_reemplazo'] ?? false;
+                    $originalSerial = $item['impresora_original_serial'] ?? null;
+
+                    if ($esReemplazo && $originalSerial) {
+                        return "<span class='text-info'>{$serial} (Reemplazo de: {$originalSerial})</span>";
+                    }
+
+                    return "<span class='text-success'>{$serial}</span>";
+                }),
+                TD::make('numero_contrato', 'Número Contrato')
+                ->render(function ($item) {
+                    if (isset($item['impresora']) && $item['impresora']->contrato) {
+                        return $item['impresora']->contrato->numero_contrato;
+                    }
+            
+                    return '<span class="text-warning">Sin contrato</span>';
+                }),
+            
+
+            TD::make('contador_inicial', 'Último Contador')
+                ->render(function ($item) {
+                    return isset($item['contador_inicial']) 
+                        ? number_format($item['contador_inicial']) 
+                        : '<span class="text-danger">N/A</span>';
+
+                }
+            ),
+
+            TD::make('contador_final', 'Contador Actual')
+                ->render(function ($item) {
+                    return isset($item['contador_final']) 
+                        ? number_format($item['contador_final']) 
+                        : '<span class="text-danger">N/A</span>';
                 }),
 
-            // Agregar valor por copia
+                TD::make('diferencia', 'Diferencia')
+                ->render(function ($item) {
+                    return isset($item['diferencia']) 
+                        ? number_format($item['diferencia']) 
+                        : '<span class="text-danger">0</span>';
+                }),
+                
             TD::make('valor_por_copia', 'Valor Copia')
-                ->render(function (Impresora $impresora) {
-                    // Accedemos al valor por copia desde el contrato asociado a la impresora
-                    return $impresora->contrato
-                        ? number_format($impresora->contrato->valor_por_copia)
-                        : 'N/A';
+                ->render(function ($item) {
+                    return isset($item['valor_por_copia']) 
+                        ? '$' . number_format($item['valor_por_copia'], 2) 
+                        : '<span class="text-warning">N/A</span>';
                 }),
 
-            // Agregar mínimo de copias
-            TD::make('copias_minimas', 'Minimo Grupal')
-                ->render(function (Impresora $impresora) {
-                    // Accedemos al mínimo de copias desde el contrato asociado a la impresora
-                    return $impresora->contrato
-                        ? $impresora->contrato->copias_minimas
-                        : 'N/A';
+            TD::make('copias_minimas', 'Mínimo Grupal')
+                ->render(function ($item) {
+                    return isset($item['copias_minimas']) 
+                        ? number_format($item['copias_minimas']) 
+                        : '<span class="text-warning">N/A</span>';
                 }),
 
-                TD::make('copias_minimas', 'Minimo Indiviudal')
-                ->render(function (Impresora $impresora) {
-                    // Obtener las copias mínimas desde la tabla contratos_impresoras
-                    $contratoImpresora = $impresora->contratoImpresora()->first();
-                    
-                    // Verificar si existe un registro en contratos_impresoras
-                    return $contratoImpresora
-                        ? number_format($contratoImpresora->copias_minimas)
-                        : 'N/A'; // Si no existe, devolvemos 'N/A'
+            TD::make('copias_minimas_individual', 'Mínimo Individual')
+                ->render(function ($item) {
+                    return isset($item['copias_minimas']) 
+                        ? number_format($item['copias_minimas']) 
+                        : '<span class="text-warning">N/A</span>';
                 }),
-            
 
-            
-
-            // Nueva columna: diferencia multiplicada por valor por copia
             TD::make('total_costo', 'Costo Total')
-                ->render(function (Impresora $impresora) {
-                    $ultimoHistorial = $impresora->ultimoHistorial();
-                    $diferencia = 0;
+                ->render(function ($item) {
+                    $diferencia = $item['diferencia'] ?? 0;
+                    $valorPorCopia = $item['valor_por_copia'] ?? 0;
 
-                    if ($ultimoHistorial) {
-                        // Calculamos la diferencia
-                        $diferencia = $impresora->contador_actual - $ultimoHistorial->contador;
+                    if ($diferencia > 0) {
+                        $costoTotal = $diferencia * $valorPorCopia;
+                        return '$' . number_format($costoTotal, 2);
                     }
 
-                    // Calculamos el costo total: diferencia * valor por copia
-                    if ($impresora->contrato && $diferencia > 0) {
-                        $costoTotal = $diferencia * $impresora->contrato->valor_por_copia;
-                        return '$' . number_format($costoTotal);
-                    }
-
-                    // Si no hay contrato o la diferencia es 0, devolvemos 'N/A'
-                    return 'N/A';
+                    return '<span class="text-warning">N/A</span>';
                 }),
         ];
     }

@@ -8,6 +8,13 @@ use Orchid\Filters\Filterable;
 use Orchid\Screen\AsSource;
 use Orchid\Attachment\Attachable;
 use Carbon\Carbon;
+use App\Models\Contrato;
+use App\Models\Reemplazo;
+use App\Models\HistorialContador;
+use App\Models\ModeloImpresora;
+use App\Models\Cliente;
+use App\Models\ContratoImpresora;
+
 
 class Impresora extends Model
 {
@@ -42,41 +49,150 @@ class Impresora extends Model
     }
 
     // Relación con Reemplazos (Una impresora puede tener varios reemplazos)
-    public function reemplazos()
+    public function reemplazo()
     {
-        return $this->hasMany(Reemplazo::class, 'id_impresora_original');
+        return $this->hasOne(Reemplazo::class, 'id_impresora_original');
     }
-
+    
+    // Relación inversa para obtener la impresora original de una impresora de reemplazo
+    public function reemplazadaPor()
+    {
+        return $this->hasOne(Reemplazo::class, 'id_impresora_reemplazo');
+    }
+    
     // Relación con Historial de Contadores
     public function historialContadores()
     {
         return $this->hasMany(HistorialContador::class);
     }
 
-    // Obtener el último historial de contador del mes anterior o el primero del mes actual
+    // public function ultimoHistorial()
+    // {
+    //     //dd('Método ultimoHistorial ejecutado'); // Verificar que el método se está ejecutando
+    
+    //     $fechaReferencia = now()->subMonth(); // Comienza un mes antes del actual
+    
+    //     // Retrocede mes a mes para encontrar el historial más reciente antes del mes actual
+    //     while ($fechaReferencia->year >= 2000) {
+    //         $ultimoHistorialMesAnterior = $this->historialContadores()
+    //             ->whereYear('fecha_registro', $fechaReferencia->year)
+    //             ->whereMonth('fecha_registro', $fechaReferencia->month)
+    //             ->orderBy('fecha_registro', 'desc')
+    //             ->orderBy('created_at', 'desc') // Orden adicional para asegurar el último del día
+    //             ->first();
+    
+    //         // Verificar la búsqueda en el mes actual de la iteración
+    //         // dd([
+    //         //     'Iterando Mes' => $fechaReferencia->format('Y-m'),
+    //         //     'Último Historial Encontrado en el Mes' => $ultimoHistorialMesAnterior,
+    //         // ]);
+    
+    //         // Si encuentra un historial en el mes actual de búsqueda, devolver ese último historial
+    //         if ($ultimoHistorialMesAnterior) {
+    //             // dd([
+    //             //     'Tipo de búsqueda' => 'Mes Anterior',
+    //             //     'Fecha de Referencia' => $fechaReferencia->format('Y-m'),
+    //             //     'Último Historial Encontrado' => $ultimoHistorialMesAnterior,
+    //             //     'Fecha Created_at' => $ultimoHistorialMesAnterior->created_at,
+    //             //     'Contador' => $ultimoHistorialMesAnterior->contador,
+    //             // ]);
+    //             return $ultimoHistorialMesAnterior;
+    //         }
+    
+    //         // Retrocede un mes si no se encuentra historial en el mes actual de búsqueda
+    //         $fechaReferencia->subMonth();
+    //     }
+    
+    //     // Si no encuentra historial en meses anteriores, busca el último registro del mes actual
+    //     $primerRegistroDelMes = $this->historialContadores()
+    //         ->whereYear('fecha_registro', now()->year)
+    //         ->whereMonth('fecha_registro', now()->month)
+    //         ->orderBy('fecha_registro', 'asc')
+    //         ->orderBy('created_at', 'asc')
+    //         ->first();
+    
+    //     $ultimoRegistroDelMes = $this->historialContadores()
+    //         ->whereYear('fecha_registro', now()->year)
+    //         ->whereMonth('fecha_registro', now()->month)
+    //         ->orderBy('fecha_registro', 'desc')
+    //         ->orderBy('created_at', 'desc')
+    //         ->first();
+    
+    //     if ($primerRegistroDelMes && $ultimoRegistroDelMes) {
+    //         // dd([
+    //         //     'Tipo de búsqueda' => 'Mes Actual',
+    //         //     'Primer Registro del Mes Actual' => $primerRegistroDelMes,
+    //         //     'Fecha Created_at del Primer Registro' => $primerRegistroDelMes->created_at,
+    //         //     'Último Registro del Mes Actual' => $ultimoRegistroDelMes,
+    //         //     'Fecha Created_at del Último Registro' => $ultimoRegistroDelMes->created_at,
+    //         //     'Contador del Último Registro' => $ultimoRegistroDelMes->contador,
+    //         // ]);
+    //     }
+    
+    //     // Si no se ha encontrado ningún historial en absoluto
+    //     //dd('No se encontró ningún historial en el mes actual ni en meses anteriores');
+    //     return null;
+    // }
+    
     public function ultimoHistorial()
-    {
-        $fechaActual = now();
-        $mesAnterior = $fechaActual->copy()->subMonth();
+{
+    $fechaReferencia = now()->subMonth(); // Comienza un mes antes del actual
 
-        // Buscar el último historial del mes anterior
+    // Retrocede mes a mes para encontrar el historial más reciente antes del mes actual
+    while ($fechaReferencia->year >= 2000) {
         $ultimoHistorialMesAnterior = $this->historialContadores()
-            ->whereYear('fecha_registro', $mesAnterior->year)
-            ->whereMonth('fecha_registro', $mesAnterior->month)
+            ->whereYear('fecha_registro', $fechaReferencia->year)
+            ->whereMonth('fecha_registro', $fechaReferencia->month)
             ->orderBy('fecha_registro', 'desc')
+            ->orderBy('created_at', 'desc') // Asegura el último registro dentro del mes
             ->first();
 
-        // Si no hay historial del mes anterior, buscar el primer historial del mes actual
-        if (!$ultimoHistorialMesAnterior) {
-            return $this->historialContadores()
-                ->whereYear('fecha_registro', $fechaActual->year)
-                ->whereMonth('fecha_registro', $fechaActual->month)
-                ->orderBy('fecha_registro', 'asc')
-                ->first();
+        // Si encuentra un historial en el mes actual de búsqueda, devolver ese último historial
+        if ($ultimoHistorialMesAnterior) {
+            return $ultimoHistorialMesAnterior;
         }
 
-        return $ultimoHistorialMesAnterior;
+        // Retrocede un mes si no se encuentra historial en el mes actual de búsqueda
+        $fechaReferencia->subMonth();
     }
+
+    // Si no se encuentra ningún historial en meses anteriores, toma el primer registro absoluto de la impresora
+    $primerHistorial = $this->historialContadores()
+        ->orderBy('fecha_registro', 'asc')
+        ->orderBy('created_at', 'asc')
+        ->first();
+
+    // Si existe un registro en absoluto, úsalo como último historial
+    return $primerHistorial ?: null; // Retorna null si no existe ningún registro en la tabla
+}
+
+public function obtenerContadorActual()
+{
+    // Busca si la impresora fue reemplazada
+    $reemplazo = $this->reemplazadaPor()->first();
+
+    if ($reemplazo) {
+        // Si existe reemplazo, utiliza el contador final del reemplazo
+        return $reemplazo->contador_final ?? 0;
+    }
+
+    // Si no es reemplazo, usa el contador actual de la tabla impresoras
+    return $this->contador_actual;
+}
+public function obtenerUltimoContador()
+{
+    // Busca si la impresora fue reemplazada
+    $reemplazo = $this->reemplazadaPor()->first();
+
+    if ($reemplazo) {
+        // Si existe reemplazo, utiliza el contador inicial del reemplazo
+        return $reemplazo->contador_inicial ?? 0;
+    }
+
+    // Si no es reemplazo, usa el último historial o 0
+    return $this->ultimoHistorial()->contador ?? 0;
+}
+
 
     // Scope para filtrar impresoras por contrato
     public function scopeDelContrato($query, $contratoId)
@@ -102,6 +218,25 @@ class Impresora extends Model
         return $query->where('estado', 'disponible');
     }
 
-    // Relación con el contrato (si es aplicable)
    
+/**
+ * Obtiene el contador anterior de la impresora, considerando reemplazos y cambios de contrato.
+ *
+ * @return int
+ */
+public function obtenerContadorAnterior()
+{
+    $reemplazoComoOriginal = $this->reemplazo()->orderBy('fecha_reemplazo', 'desc')->first();
+
+    if ($reemplazoComoOriginal && $reemplazoComoOriginal->numero_contrato != $this->contrato_id) {
+        $contadorInicial = $reemplazoComoOriginal->contador_inicial;
+        //dd("Contador inicial de reemplazo", $contadorInicial); // Agrega este dd
+        return $contadorInicial;
+    }
+
+    $ultimoHistorial = $this->ultimoHistorial()->contador ?? 0;
+  //  dd("Último historial", $ultimoHistorial); // Agrega este dd
+    return $ultimoHistorial;
+}
+
 }

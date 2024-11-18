@@ -11,35 +11,21 @@ use App\Models\Reemplazo;
 use Illuminate\Http\Request;
 use Orchid\Screen\Fields\Select;
 use App\Models\Impresora;
+use App\Models\ContratoImpresora;
 use Orchid\Screen\Fields\Datetimer;
 
 class ReemplazoCreateScreen extends Screen
 {
-    /**
-     * Permiso requerido para acceder a esta pantalla.
-     *
-     * @return array|null
-     */
     public function permission(): ?array
     {
-        return ['platform.reemplazos.create']; // Permiso requerido para crear reemplazos
+        return ['platform.reemplazos.create'];
     }
 
-    /**
-     * Nombre que se muestra en el encabezado de la pantalla.
-     *
-     * @return string
-     */
     public function name(): string
     {
         return 'Crear Reemplazo';
     }
 
-    /**
-     * Botones de la barra de comandos.
-     *
-     * @return Button[]
-     */
     public function commandBar(): array
     {
         return [
@@ -48,34 +34,29 @@ class ReemplazoCreateScreen extends Screen
         ];
     }
 
-    /**
-     * Layouts y campos para el formulario.
-     *
-     * @return Layout[]
-     */
     public function layout(): array
     {
         return [
             Layout::rows([
-                Select::make('reemplazo.id_impresora_original') // Campo para impresora original
+                Select::make('reemplazo.id_impresora_original')
                     ->title('Impresora Original')
                     ->placeholder('Seleccione la impresora original')
-                    ->fromQuery(Impresora::contratadas(), 'serial', 'id') // Filtrar impresoras en contrato
+                    ->fromQuery(Impresora::contratadas(), 'serial', 'id')
                     ->required(),
 
-                Select::make('reemplazo.id_impresora_reemplazo') // Campo para impresora de reemplazo
+                Select::make('reemplazo.id_impresora_reemplazo')
                     ->title('Impresora de Reemplazo')
                     ->placeholder('Seleccione la impresora de reemplazo')
-                    ->fromQuery(Impresora::disponibles(), 'serial', 'id') // Filtrar impresoras disponibles
+                    ->fromQuery(Impresora::disponibles(), 'serial', 'id')
                     ->required(),
 
-                Datetimer::make('reemplazo.fecha_reemplazo') // Campo para fecha de reemplazo
+                Datetimer::make('reemplazo.fecha_reemplazo')
                     ->title('Fecha de Reemplazo')
                     ->placeholder('Ingrese la fecha del reemplazo')
                     ->required()
                     ->type('date'),
 
-                Datetimer::make('reemplazo.fecha_reactivacion') // Campo para fecha de reactivación
+                Datetimer::make('reemplazo.fecha_reactivacion')
                     ->title('Fecha de Reactivación')
                     ->placeholder('Ingrese la fecha de reactivación')
                     ->type('date'),
@@ -83,55 +64,62 @@ class ReemplazoCreateScreen extends Screen
         ];
     }
 
-    /**
-     * Consulta de datos para la pantalla (no se necesita aquí, retorna vacío).
-     *
-     * @return array
-     */
     public function query(): array
     {
-        return []; // No necesitamos datos para este formulario
+        return [];
     }
 
-    /**
-     * Guardar el nuevo reemplazo en la base de datos.
-     *
-     * @param Request $request
-     */
     public function save(Request $request)
     {
-        // Obtener los IDs de las impresoras del request
         $idImpresoraOriginal = $request->input('reemplazo.id_impresora_original');
         $idImpresoraReemplazo = $request->input('reemplazo.id_impresora_reemplazo');
     
-        // Obtener las impresoras de la base de datos
+        // Obtener impresoras de la base de datos
         $impresoraOriginal = Impresora::findOrFail($idImpresoraOriginal);
         $impresoraReemplazo = Impresora::findOrFail($idImpresoraReemplazo);
     
-        // Guardar el contrato de la impresora original antes de cambiarlo
+        // Obtener contrato de la impresora original
         $contratoIdOriginal = $impresoraOriginal->contrato_id;
     
-        // Disociar la impresora original del contrato (dejar su contrato en null)
-        $impresoraOriginal->update([
-            'contrato_id' => null,
-            'estado' => 'recambio', // Cambiar el estado de la impresora original a "reemplazo"
-        ]);
+        // Determinar contadores inicial y final
+        $contadorInicial = $impresoraOriginal->ultimoHistorial()->contador ?? 0; // Último historial
+        $contadorFinal = $impresoraOriginal->contador_actual; // Contador actual de la tabla `impresoras`
     
-        // Asociar la impresora de reemplazo al contrato de la impresora original
-        $impresoraReemplazo->update([
-            'contrato_id' => $contratoIdOriginal,
-            'estado' => 'contrato', // Cambiar el estado de la impresora de reemplazo a "contrato"
-        ]);
-    
-        // Crear el nuevo reemplazo en la tabla 'reemplazos'
+        // Crear el registro en la tabla `reemplazos`
         Reemplazo::create([
             'id_impresora_original' => $idImpresoraOriginal,
             'id_impresora_reemplazo' => $idImpresoraReemplazo,
             'fecha_reemplazo' => $request->input('reemplazo.fecha_reemplazo'),
             'fecha_reactivacion' => $request->input('reemplazo.fecha_reactivacion'),
+            'numero_contrato' => $contratoIdOriginal,
+            'contador_inicial' => $contadorInicial, // Último historial
+            'contador_final' => $contadorFinal,     // Contador actual
         ]);
     
-        // Mostrar mensaje de éxito
-        Toast::info('Reemplazo creado correctamente.');
+        // Actualizar estados de las impresoras
+        $impresoraOriginal->update([
+            'contrato_id' => null,
+            'estado' => 'recambio', // Marca como en recambio
+        ]);
+    
+        $impresoraReemplazo->update([
+            'contrato_id' => $contratoIdOriginal ?? 0, // Asigna el contrato de la original
+            'estado' => 'contrato', // Marca como activa en contrato
+        ]);
+    
+        // Asociar las configuraciones de `copias_minimas`
+        $contratoImpresoraOriginal = ContratoImpresora::where('contrato_id', $contratoIdOriginal)
+            ->where('impresora_id', $idImpresoraOriginal)
+            ->first();
+    
+        if ($contratoImpresoraOriginal) {
+            ContratoImpresora::create([
+                'contrato_id' => $contratoIdOriginal,
+                'impresora_id' => $idImpresoraReemplazo,
+                'copias_minimas' => $contratoImpresoraOriginal->copias_minimas,
+            ]);
+        }
+    
+        Toast::info('Reemplazo creado correctamente con contadores inicial y final guardados.');
     }
-}
+} 

@@ -12,7 +12,12 @@ class ImpresoraObserver
      */
     public function created(Impresora $impresora): void
     {
-        //
+        // Registrar un historial inicial con el contador actual
+        HistorialContador::create([
+            'impresora_id' => $impresora->id,
+            'contador' => $impresora->contador_actual,
+            'fecha_registro' => now(), // Puedes asignar una fecha específica si es necesario
+        ]);
     }
 
     /**

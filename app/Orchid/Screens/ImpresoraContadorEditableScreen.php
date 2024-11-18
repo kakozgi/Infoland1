@@ -70,18 +70,24 @@ class ImpresoraContadorEditableScreen extends Screen
         ]);
     }
 
-    public function actualizarContador(Request $request)
-    {
-        $impresoraId = $request->get('impresora_id');
-        $nuevoContador = $request->input("impresoras.$impresoraId.contador_actual");
+   // Screen ImpresoraContadorEditableScreen.php
+public function actualizarContador(Request $request)
+{
+    // Usar dd() para ver los datos de entrada
+    //dd($request->all());
 
-        // Actualizar la impresora
-        $impresora = Impresora::find($impresoraId);
-        if ($impresora && $nuevoContador) {
-            $impresora->contador_actual = $nuevoContador;
-            $impresora->save();
-        }
+    // Obtiene el ID de la impresora y el nuevo valor del contador
+    $impresoraId = $request->get('impresora_id');
+    $nuevoContadorKey = "contador_actual_{$impresoraId}";
+    $nuevoContador = $request->input($nuevoContadorKey);
 
-        return redirect()->back()->with('success', 'Contador actualizado correctamente.');
+    $impresora = Impresora::find($impresoraId);
+    if ($impresora && $nuevoContador) {
+        $impresora->contador_actual = $nuevoContador;
+        $impresora->save();
     }
+
+    return redirect()->back()->with('success', 'Contador actualizado correctamente.');
+}
+
 }
