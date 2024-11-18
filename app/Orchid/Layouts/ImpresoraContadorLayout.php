@@ -7,18 +7,14 @@ use Orchid\Screen\Layouts\Table;
 
 class ImpresoraContadorLayout extends Table
 {
-    public $target = 'impresoras'; // Esta clave debe coincidir con lo enviado desde el query()
+    public $target = 'impresoras'; // Clave que coincide con los datos enviados desde el query()
 
     public function columns(): array
     {
         return [
             TD::make('serial', 'Serial Impresora')
                 ->render(function ($item) {
-                    if (!isset($item['serial'])) {
-                        return '<span class="text-danger">Sin datos de impresora</span>';
-                    }
-
-                    $serial = $item['serial'];
+                    $serial = $item['serial'] ?? 'Sin serial';
                     $esReemplazo = $item['es_reemplazo'] ?? false;
                     $originalSerial = $item['impresora_original_serial'] ?? null;
 
@@ -27,14 +23,12 @@ class ImpresoraContadorLayout extends Table
                     }
 
                     return "<span class='text-success'>{$serial}</span>";
-                }),
+                })
+                ->popover('Este es el número de serie de la impresora'),
+
                 TD::make('numero_contrato', 'Número Contrato')
                 ->render(function ($item) {
-                    if (isset($item['impresora']) && $item['impresora']->contrato) {
-                        return $item['impresora']->contrato->numero_contrato;
-                    }
-            
-                    return '<span class="text-warning">Sin contrato</span>';
+                    return $item['numero_contrato'] ?? '<span class="text-warning">Sin contrato</span>';
                 }),
             
 
@@ -43,9 +37,7 @@ class ImpresoraContadorLayout extends Table
                     return isset($item['contador_inicial']) 
                         ? number_format($item['contador_inicial']) 
                         : '<span class="text-danger">N/A</span>';
-
-                }
-            ),
+                }),
 
             TD::make('contador_final', 'Contador Actual')
                 ->render(function ($item) {
@@ -54,31 +46,18 @@ class ImpresoraContadorLayout extends Table
                         : '<span class="text-danger">N/A</span>';
                 }),
 
-                TD::make('diferencia', 'Diferencia')
+            TD::make('diferencia', 'Diferencia')
                 ->render(function ($item) {
                     return isset($item['diferencia']) 
                         ? number_format($item['diferencia']) 
                         : '<span class="text-danger">0</span>';
-                }),
-                
-            TD::make('valor_por_copia', 'Valor Copia')
+                })
+                ->popover('Diferencia entre el contador inicial y final para este periodo'),
+
+            TD::make('valor_por_copia', 'Valor por Copia')
                 ->render(function ($item) {
                     return isset($item['valor_por_copia']) 
                         ? '$' . number_format($item['valor_por_copia'], 2) 
-                        : '<span class="text-warning">N/A</span>';
-                }),
-
-            TD::make('copias_minimas', 'Mínimo Grupal')
-                ->render(function ($item) {
-                    return isset($item['copias_minimas']) 
-                        ? number_format($item['copias_minimas']) 
-                        : '<span class="text-warning">N/A</span>';
-                }),
-
-            TD::make('copias_minimas_individual', 'Mínimo Individual')
-                ->render(function ($item) {
-                    return isset($item['copias_minimas']) 
-                        ? number_format($item['copias_minimas']) 
                         : '<span class="text-warning">N/A</span>';
                 }),
 
@@ -93,6 +72,15 @@ class ImpresoraContadorLayout extends Table
                     }
 
                     return '<span class="text-warning">N/A</span>';
+                }),
+
+            TD::make('fecha_reemplazo', 'Fecha de Reemplazo')
+                ->render(function ($item) {
+                    if (isset($item['es_reemplazo']) && $item['es_reemplazo'] && isset($item['fecha_reemplazo'])) {
+                        return date('d-m-Y', strtotime($item['fecha_reemplazo']));
+                    }
+
+                    return '<span class="text-muted">No aplica</span>';
                 }),
         ];
     }

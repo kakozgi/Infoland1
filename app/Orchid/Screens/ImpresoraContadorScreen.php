@@ -120,13 +120,11 @@ class ImpresoraContadorScreen extends Screen
         $totalCosto = 0;
         $totalCopias = 0;
         $impresoras = collect();
-        $impresoras = Impresora::with('contrato')->get();
         $diferenciasPorContrato = [];
     
         if ($clienteSeleccionado) {
+            // Obtener impresoras y sus reemplazos asociados al cliente seleccionado
             $impresoras = $this->obtenerImpresorasYReemplazosPorCliente($clienteSeleccionado);
-
-
     
             foreach ($impresoras as $item) {
                 if (!isset($item['impresora'])) {
@@ -136,9 +134,11 @@ class ImpresoraContadorScreen extends Screen
                 $impresora = $item['impresora'];
                 $datosCongelados = $item['datos_congelados'] ?? null;
     
+                // Obtener contadores inicial y final
                 $contadorInicial = $datosCongelados['contador_inicial'] ?? $impresora->obtenerUltimoContador();
                 $contadorFinal = $datosCongelados['contador_final'] ?? $impresora->obtenerContadorActual();
     
+                // Obtener el contrato asociado a la impresora
                 $contrato = $impresora->contrato;
     
                 if (!$contrato) {
@@ -163,6 +163,7 @@ class ImpresoraContadorScreen extends Screen
                     'copias_minimas' => $contrato->copias_minimas ?? 0,
                     'es_reemplazo' => $item['es_reemplazo'] ?? false,
                     'impresora_original_serial' => $item['impresora_original_serial'] ?? null,
+                    'numero_contrato' => $numeroContrato, // Incluimos el número de contrato
                 ];
     
                 $diferenciasPorContrato[$numeroContrato]['suma_diferencias'] += $diferencia;
@@ -183,15 +184,6 @@ class ImpresoraContadorScreen extends Screen
                 $totalCosto += $datosContrato['costo_contrato'];
             }
         }
-
-        // dd([
-        //     'impresoras' => $impresoras->map(...),
-        //     'clienteSeleccionado' => $clienteSeleccionado,
-        //     'totalCosto' => $totalCosto,
-        //     'totalCopias' => $totalCopias,
-        //     'diferenciasPorContrato' => $diferenciasPorContrato,
-        // ]);
-        
     
         return [
             'impresoras' => $impresoras->map(function ($item) {
@@ -201,10 +193,13 @@ class ImpresoraContadorScreen extends Screen
                         'contador_inicial' => 0,
                         'contador_final' => 0,
                         'diferencia' => 0,
+                        'numero_contrato' => '<span class="text-warning">Sin contrato</span>',
                     ];
                 }
     
                 $impresora = $item['impresora'];
+                $contrato = $impresora->contrato;
+    
                 return [
                     'serial' => $impresora->serial ?? 'Sin serial',
                     'es_reemplazo' => $item['es_reemplazo'] ?? false,
@@ -212,13 +207,13 @@ class ImpresoraContadorScreen extends Screen
                     'contador_inicial' => $item['datos_congelados']['contador_inicial'] ?? $impresora->obtenerUltimoContador(),
                     'contador_final' => $item['datos_congelados']['contador_final'] ?? $impresora->obtenerContadorActual(),
                     'diferencia' => max(0, $item['datos_congelados']['contador_final'] ?? $impresora->obtenerContadorActual() - ($item['datos_congelados']['contador_inicial'] ?? $impresora->obtenerUltimoContador())),
+                    'numero_contrato' => $contrato ? $contrato->numero_contrato : '<span class="text-warning">Sin contrato</span>',
                 ];
             }),
             'clienteSeleccionado' => $clienteSeleccionado,
             'totalCosto' => $totalCosto,
             'totalCopias' => $totalCopias,
             'diferenciasPorContrato' => $diferenciasPorContrato,
-            
         ];
     }
     
