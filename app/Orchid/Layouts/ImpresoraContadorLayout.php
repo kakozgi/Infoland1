@@ -4,17 +4,19 @@ namespace App\Orchid\Layouts;
 
 use Orchid\Screen\TD;
 use Orchid\Screen\Layouts\Table;
+use App\Models\Contrato;
+use App\Models\Impresora;
 
 class ImpresoraContadorLayout extends Table
 {
-    public $target = 'impresoras'; // Clave que coincide con los datos enviados desde el query()
+    public $target = 'impresoras'; // Esta clave debe coincidir con lo enviado desde el query()
 
     public function columns(): array
     {
         return [
             TD::make('serial', 'Serial Impresora')
                 ->render(function ($item) {
-                    $serial = $item['serial'] ?? 'Sin serial';
+                    $serial = $item['serial'] ?? 'Sin datos de impresora';
                     $esReemplazo = $item['es_reemplazo'] ?? false;
                     $originalSerial = $item['impresora_original_serial'] ?? null;
 
@@ -23,12 +25,15 @@ class ImpresoraContadorLayout extends Table
                     }
 
                     return "<span class='text-success'>{$serial}</span>";
-                })
-                ->popover('Este es el número de serie de la impresora'),
+                }),
 
                 TD::make('numero_contrato', 'Número Contrato')
-                ->render(function ($item) {
-                    return $item['numero_contrato'] ?? '<span class="text-warning">Sin contrato</span>';
+                ->render(function ($impresora) {
+                    if (is_object($impresora) && $impresora->contrato) {
+                        return $impresora->contrato->numero_contrato;
+                    }
+            
+                    return '<span class="text-warning">Sin contrato</span>';
                 }),
             
 
@@ -51,36 +56,69 @@ class ImpresoraContadorLayout extends Table
                     return isset($item['diferencia']) 
                         ? number_format($item['diferencia']) 
                         : '<span class="text-danger">0</span>';
-                })
-                ->popover('Diferencia entre el contador inicial y final para este periodo'),
-
-            TD::make('valor_por_copia', 'Valor por Copia')
-                ->render(function ($item) {
-                    return isset($item['valor_por_copia']) 
-                        ? '$' . number_format($item['valor_por_copia'], 2) 
-                        : '<span class="text-warning">N/A</span>';
                 }),
 
-            TD::make('total_costo', 'Costo Total')
+            TD::make('valor_por_copia', 'Valor Copia')
                 ->render(function ($item) {
-                    $diferencia = $item['diferencia'] ?? 0;
-                    $valorPorCopia = $item['valor_por_copia'] ?? 0;
+                    if (!isset($item['id'])) {
+                        return '<span class="text-warning">N/A</span>';
+                    }
 
-                    if ($diferencia > 0) {
-                        $costoTotal = $diferencia * $valorPorCopia;
-                        return '$' . number_format($costoTotal, 2);
+                    // Verificar el contrato directamente desde la base de datos
+                    $impresora = Impresora::find($item['id']);
+                    if ($impresora && $impresora->contrato) {
+                        return '$' . number_format($impresora->contrato->valor_por_copia, 2);
                     }
 
                     return '<span class="text-warning">N/A</span>';
                 }),
 
-            TD::make('fecha_reemplazo', 'Fecha de Reemplazo')
+            TD::make('copias_minimas', 'Mínimo Grupal')
                 ->render(function ($item) {
-                    if (isset($item['es_reemplazo']) && $item['es_reemplazo'] && isset($item['fecha_reemplazo'])) {
-                        return date('d-m-Y', strtotime($item['fecha_reemplazo']));
+                    if (!isset($item['id'])) {
+                        return '<span class="text-warning">N/A</span>';
                     }
 
-                    return '<span class="text-muted">No aplica</span>';
+                    // Verificar el contrato directamente desde la base de datos
+                    $impresora = Impresora::find($item['id']);
+                    if ($impresora && $impresora->contrato) {
+                        return number_format($impresora->contrato->copias_minimas);
+                    }
+
+                    return '<span class="text-warning">N/A</span>';
+                }),
+
+            TD::make('copias_minimas_individual', 'Mínimo Individual')
+                ->render(function ($item) {
+                    if (!isset($item['id'])) {
+                        return '<span class="text-warning">N/A</span>';
+                    }
+
+                    // Verificar el contrato de la impresora directamente
+                    $impresora = Impresora::find($item['id']);
+                    if ($impresora && $impresora->contratoImpresora) {
+                        return number_format($impresora->contratoImpresora->copias_minimas);
+                    }
+
+                    return '<span class="text-warning">N/A</span>';
+                }),
+
+            TD::make('total_costo', 'Costo Total')
+                ->render(function ($item) {
+                    $diferencia = $item['diferencia'] ?? 0;
+
+                    if (!isset($item['id'])) {
+                        return '<span class="text-warning">N/A</span>';
+                    }
+
+                    $impresora = Impresora::find($item['id']);
+                    if ($impresora && $impresora->contrato) {
+                        $valorPorCopia = $impresora->contrato->valor_por_copia ?? 0;
+                        $costoTotal = $diferencia * $valorPorCopia;
+                        return '$' . number_format($costoTotal, 2);
+                    }
+
+                    return '<span class="text-warning">N/A</span>';
                 }),
         ];
     }

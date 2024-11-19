@@ -41,6 +41,7 @@ class Impresora extends Model
     {
         return $this->belongsTo(Contrato::class, 'contrato_id');
     }
+    
 
     // Relación con Cliente a través del contrato
     public function cliente()
@@ -166,32 +167,41 @@ class Impresora extends Model
     return $primerHistorial ?: null; // Retorna null si no existe ningún registro en la tabla
 }
 
+/**
+ * Obtiene el contador actual considerando si fue reemplazada.
+ *
+ * @return int
+ */
 public function obtenerContadorActual()
 {
-    // Busca si la impresora fue reemplazada
-    $reemplazo = $this->reemplazadaPor()->first();
+    $reemplazo = $this->reemplazadaPor()->latest()->first();
 
     if ($reemplazo) {
-        // Si existe reemplazo, utiliza el contador final del reemplazo
-        return $reemplazo->contador_final ?? 0;
+        // Si esta impresora es un reemplazo, usa el contador final del reemplazo
+        return $reemplazo->contador_final ?? $this->contador_actual;
     }
 
-    // Si no es reemplazo, usa el contador actual de la tabla impresoras
-    return $this->contador_actual;
+    // Si no hay reemplazo, usa el contador actual
+    return $this->contador_actual ?? 0;
 }
+/**
+ * Obtiene el último contador registrado antes de ser reemplazada.
+ *
+ * @return int
+ */
 public function obtenerUltimoContador()
 {
-    // Busca si la impresora fue reemplazada
-    $reemplazo = $this->reemplazadaPor()->first();
+    $reemplazo = $this->reemplazo()->latest()->first();
 
     if ($reemplazo) {
-        // Si existe reemplazo, utiliza el contador inicial del reemplazo
+        // Si esta impresora es reemplazada, usa su contador inicial
         return $reemplazo->contador_inicial ?? 0;
     }
 
-    // Si no es reemplazo, usa el último historial o 0
+    // Si no hay reemplazo, usa el último historial registrado
     return $this->ultimoHistorial()->contador ?? 0;
 }
+
 
 
     // Scope para filtrar impresoras por contrato
@@ -238,5 +248,41 @@ public function obtenerContadorAnterior()
   //  dd("Último historial", $ultimoHistorial); // Agrega este dd
     return $ultimoHistorial;
 }
+
+/**
+ * Obtiene el contrato original al que pertenece esta impresora, incluso si ha sido reemplazada.
+ *
+ * @return Contrato|null
+ */
+public function obtenerContratoOriginal()
+{
+    $reemplazo = $this->reemplazadaPor()->latest()->first();
+
+    if ($reemplazo && $reemplazo->impresoraOriginal) {
+        return $reemplazo->impresoraOriginal->contrato;
+    }
+
+    return $this->contrato;
+}
+/**
+ * Obtiene el estado actual de la impresora.
+ *
+ * @return string
+ */
+public function obtenerEstadoActual()
+{
+    $reemplazo = $this->reemplazadaPor()->latest()->first();
+
+    if ($reemplazo) {
+        return 'Reemplazada';
+    }
+
+    if ($this->estado === 'contrato') {
+        return 'Activa';
+    }
+
+    return 'Disponible';
+}
+
 
 }

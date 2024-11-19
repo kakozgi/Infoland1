@@ -119,11 +119,10 @@ class ImpresoraContadorScreen extends Screen
         $clienteSeleccionado = request()->get('cliente_id');
         $totalCosto = 0;
         $totalCopias = 0;
-        $impresoras = collect();
         $diferenciasPorContrato = [];
+        $impresoras = collect();
     
         if ($clienteSeleccionado) {
-            // Obtener impresoras y sus reemplazos asociados al cliente seleccionado
             $impresoras = $this->obtenerImpresorasYReemplazosPorCliente($clienteSeleccionado);
     
             foreach ($impresoras as $item) {
@@ -132,14 +131,9 @@ class ImpresoraContadorScreen extends Screen
                 }
     
                 $impresora = $item['impresora'];
-                $datosCongelados = $item['datos_congelados'] ?? null;
-    
-                // Obtener contadores inicial y final
-                $contadorInicial = $datosCongelados['contador_inicial'] ?? $impresora->obtenerUltimoContador();
-                $contadorFinal = $datosCongelados['contador_final'] ?? $impresora->obtenerContadorActual();
-    
-                // Obtener el contrato asociado a la impresora
-                $contrato = $impresora->contrato;
+                $contadorInicial = $impresora->obtenerUltimoContador();
+                $contadorFinal = $impresora->obtenerContadorActual();
+                $contrato = $impresora->obtenerContratoOriginal();
     
                 if (!$contrato) {
                     continue;
@@ -163,7 +157,6 @@ class ImpresoraContadorScreen extends Screen
                     'copias_minimas' => $contrato->copias_minimas ?? 0,
                     'es_reemplazo' => $item['es_reemplazo'] ?? false,
                     'impresora_original_serial' => $item['impresora_original_serial'] ?? null,
-                    'numero_contrato' => $numeroContrato, // Incluimos el número de contrato
                 ];
     
                 $diferenciasPorContrato[$numeroContrato]['suma_diferencias'] += $diferencia;
@@ -182,8 +175,17 @@ class ImpresoraContadorScreen extends Screen
                     );
                 }
                 $totalCosto += $datosContrato['costo_contrato'];
-            }
+     }
         }
+    
+        // Añadimos un dd para depurar la salida
+        dd([
+            'impresoras' => $impresoras->toArray(), // Convierto a array para inspección más clara
+            'clienteSeleccionado' => $clienteSeleccionado,
+            'totalCosto' => $totalCosto,
+            'totalCopias' => $totalCopias,
+            'diferenciasPorContrato' => $diferenciasPorContrato,
+        ]);
     
         return [
             'impresoras' => $impresoras->map(function ($item) {
@@ -193,21 +195,17 @@ class ImpresoraContadorScreen extends Screen
                         'contador_inicial' => 0,
                         'contador_final' => 0,
                         'diferencia' => 0,
-                        'numero_contrato' => '<span class="text-warning">Sin contrato</span>',
                     ];
                 }
     
                 $impresora = $item['impresora'];
-                $contrato = $impresora->contrato;
-    
                 return [
                     'serial' => $impresora->serial ?? 'Sin serial',
                     'es_reemplazo' => $item['es_reemplazo'] ?? false,
                     'impresora_original_serial' => $item['impresora_original_serial'] ?? null,
-                    'contador_inicial' => $item['datos_congelados']['contador_inicial'] ?? $impresora->obtenerUltimoContador(),
-                    'contador_final' => $item['datos_congelados']['contador_final'] ?? $impresora->obtenerContadorActual(),
-                    'diferencia' => max(0, $item['datos_congelados']['contador_final'] ?? $impresora->obtenerContadorActual() - ($item['datos_congelados']['contador_inicial'] ?? $impresora->obtenerUltimoContador())),
-                    'numero_contrato' => $contrato ? $contrato->numero_contrato : '<span class="text-warning">Sin contrato</span>',
+                    'contador_inicial' => $impresora->obtenerUltimoContador(),
+                    'contador_final' => $impresora->obtenerContadorActual(),
+                    'diferencia' => max(0, $impresora->obtenerContadorActual() - $impresora->obtenerUltimoContador()),
                 ];
             }),
             'clienteSeleccionado' => $clienteSeleccionado,
@@ -216,6 +214,7 @@ class ImpresoraContadorScreen extends Screen
             'diferenciasPorContrato' => $diferenciasPorContrato,
         ];
     }
+    
     
     
     private function obtenerContadorInicial(Impresora $impresora)
@@ -280,38 +279,44 @@ class ImpresoraContadorScreen extends Screen
             ->with('success', 'La facturación se ha confirmado y guardado correctamente.');
     }
 
-    private function obtenerImpresorasYReemplazosPorCliente($clienteSeleccionado)
+    private function obtenerImpresorasYReemplazosPorCliente($clienteId)
     {
+        // Obtén impresoras activas del cliente con la relación contrato
         $impresoras = Impresora::with('contrato')
-            ->whereHas('contrato', function ($query) use ($clienteSeleccionado) {
-                $query->where('cliente_id', $clienteSeleccionado);
+            ->whereHas('contrato', function ($query) use ($clienteId) {
+                $query->where('cliente_id', $clienteId);
             })
             ->get();
     
         $idsImpresoras = $impresoras->pluck('id');
     
+        // Obtén reemplazos relacionados con estas impresoras activas
         $reemplazos = Reemplazo::whereIn('id_impresora_reemplazo', $idsImpresoras)
             ->orWhereIn('id_impresora_original', $idsImpresoras)
             ->get();
     
+        // Colección para almacenar todas las impresoras con su estado y datos congelados
         $impresorasConReemplazos = collect();
     
         foreach ($impresoras as $impresora) {
+            // Verifica si la impresora está en la tabla Reemplazo como reemplazo
             $reemplazo = $reemplazos->firstWhere('id_impresora_reemplazo', $impresora->id);
     
             if ($reemplazo) {
-                $impresoraOriginal = Impresora::find($reemplazo->id_impresora_original);
+                // Si la impresora es un reemplazo, usar los datos de la impresora original
+                $impresoraOriginal = Impresora::with('contrato')->find($reemplazo->id_impresora_original);
+    
                 $impresorasConReemplazos->push([
                     'impresora' => $impresoraOriginal ?? $impresora,
                     'es_reemplazo' => true,
-                    'impresora_original_serial' => $impresoraOriginal ? $impresoraOriginal->serial : null,
+                    'impresora_original_serial' => $impresoraOriginal->serial ?? null,
                     'datos_congelados' => [
                         'contador_inicial' => $reemplazo->contador_inicial,
                         'contador_final' => $reemplazo->contador_final,
-                        'fecha_reemplazo' => $reemplazo->fecha_reemplazo,
                     ],
                 ]);
             } else {
+                // Si no es reemplazo, mostrar la impresora tal cual
                 $impresorasConReemplazos->push([
                     'impresora' => $impresora,
                     'es_reemplazo' => false,
@@ -320,11 +325,11 @@ class ImpresoraContadorScreen extends Screen
                 ]);
             }
         }
-
-
     
         return $impresorasConReemplazos;
     }
+    
+
     
     private function inicializarDatosContrato($contrato)
     {
