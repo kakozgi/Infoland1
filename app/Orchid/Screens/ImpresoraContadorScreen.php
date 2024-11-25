@@ -24,62 +24,77 @@ class ImpresoraContadorScreen extends Screen
         return 'Visualizar Impresoras por Clientes';
     }
 
+
     // public function query(): array
     // {
     //     $clienteSeleccionado = request()->get('cliente_id');
     //     $totalCosto = 0;
     //     $totalCopias = 0;
-    //     $impresoras = collect();
     //     $diferenciasPorContrato = [];
-        
+    //     $impresoras = collect();
+    
     //     if ($clienteSeleccionado) {
-    //         // Obtén las impresoras y reemplazos para el cliente seleccionado
     //         $impresoras = $this->obtenerImpresorasYReemplazosPorCliente($clienteSeleccionado);
-        
+    
     //         foreach ($impresoras as $item) {
+    //             if (!isset($item['impresora'])) {
+    //                 continue;
+    //             }
+    
     //             $impresora = $item['impresora'];
     //             $contrato = $impresora->contrato;
-        
-    //             if (!$contrato) continue;
-        
-    //             // Llama al método del modelo para obtener el contador anterior
-    //             $contadorAnterior = $impresora->obtenerContadorAnterior();
-    //             $diferencia = max(0, $impresora->contador_actual - $contadorAnterior);
     
-    //             $totalCopias += $diferencia;
-        
+    //             if (!$contrato) {
+    //                 continue;
+    //             }
+    
+    //             // Obtener copias mínimas según tipo de contrato
+    //             $copiasMinimas = $contrato->tipo_minimo === 'grupal'
+    //                 ? $contrato->copias_minimas
+    //                 : $this->obtenerCopiasMinimasIndividuales($contrato->id, $impresora->id);
+    
+    //             // Obtener contadores
+    //             $contadorInicial = $item['datos_congelados']['contador_inicial'] ?? $impresora->obtenerUltimoContador() ?? 0;
+    //             $contadorFinal = $item['datos_congelados']['contador_final'] ?? $impresora->obtenerContadorActual() ?? 0;
+    
+    //             // Diferencia actual
+    //             $diferenciaActual = max(0, $contadorFinal - $contadorInicial);
+    
+    //             // Diferencia total (incluyendo reemplazo si aplica)
+    //             $diferenciaReemplazo = $item['diferencia_total'] ?? 0;
+    //             $diferenciaTotal = $diferenciaActual + $diferenciaReemplazo;
+    
+    //             $totalCopias += $diferenciaTotal;
+    
     //             $numeroContrato = $contrato->numero_contrato;
-        
+    
+    //             // Inicializar datos del contrato si no existen
     //             if (!isset($diferenciasPorContrato[$numeroContrato])) {
     //                 $diferenciasPorContrato[$numeroContrato] = $this->inicializarDatosContrato($contrato);
     //                 $diferenciasPorContrato[$numeroContrato]['impresoras'] = [];
     //             }
-        
-    //             $contratoImpresora = ContratoImpresora::where('contrato_id', $contrato->id)
-    //                 ->where('impresora_id', $impresora->id)
-    //                 ->first();
-    //             $copiasMinimas = $contratoImpresora ? $contratoImpresora->copias_minimas : 0;
-        
-    //             $costoImpresora = $this->calcularCostoIndividual($impresora, $diferencia, $contrato);
     
+    //             // Agregar datos de la impresora al contrato
     //             $diferenciasPorContrato[$numeroContrato]['impresoras'][] = [
     //                 'id' => $impresora->id,
-    //                 'contador_anterior' => $contadorAnterior,
-    //                 'diferencia' => $diferencia,
+    //                 'serial' => $impresora->serial,
+    //                 'contador_inicial' => $contadorInicial,
+    //                 'contador_final' => $contadorFinal,
+    //                 'diferencia' => $diferenciaTotal,
+    //                 'valor_por_copia' => $contrato->valor_por_copia,
     //                 'copias_minimas' => $copiasMinimas,
-    //                 'costo_calculado' => $costoImpresora,
+    //                 'tipo_minimo' => $contrato->tipo_minimo,
     //                 'es_reemplazo' => $item['es_reemplazo'] ?? false,
     //                 'impresora_original_serial' => $item['impresora_original_serial'] ?? null,
     //             ];
     
-    //             $diferenciasPorContrato[$numeroContrato]['suma_diferencias'] += $diferencia;
-        
+    //             $diferenciasPorContrato[$numeroContrato]['suma_diferencias'] += $diferenciaTotal;
+    
     //             if ($contrato->tipo_minimo === 'individual') {
-    //                 $diferenciasPorContrato[$numeroContrato]['costo_contrato'] += $costoImpresora;
+    //                 $diferenciasPorContrato[$numeroContrato]['costo_contrato'] += $this->calcularCostoIndividual($diferenciaTotal, $copiasMinimas, $contrato->valor_por_copia);
     //             }
     //         }
     
-    //         // Cálculo de costos grupales
     //         foreach ($diferenciasPorContrato as &$datosContrato) {
     //             if ($datosContrato['tipo_minimo'] === 'grupal') {
     //                 $datosContrato['costo_contrato'] = $this->calcularCostoGrupal(
@@ -92,22 +107,38 @@ class ImpresoraContadorScreen extends Screen
     //         }
     //     }
     
-    //     $impresorasData = $impresoras->map(function ($item) {
-    //         $impresora = $item['impresora'];
-    //         $contadorAnterior = $impresora->obtenerContadorAnterior();
-    //         $diferencia = max(0, $impresora->contador_actual - $contadorAnterior);
-    
-    //         return [
-    //             'impresora' => $impresora,
-    //             'es_reemplazo' => $item['es_reemplazo'] ?? false,
-    //             'impresora_original_serial' => $item['impresora_original_serial'] ?? null,
-    //             'contador_anterior' => $contadorAnterior,
-    //             'diferencia' => $diferencia,
-    //         ];
-    //     });
-    
     //     return [
-    //         'impresoras' => $impresorasData,
+    //         'impresoras' => $impresoras->map(function ($item) {
+    //             if (!isset($item['impresora'])) {
+    //                 return [
+    //                     'serial' => '<span class="text-danger">Sin datos</span>',
+    //                     'contador_inicial' => 0,
+    //                     'contador_final' => 0,
+    //                     'diferencia' => 0,
+    //                     'valor_por_copia' => 0,
+    //                     'copias_minimas' => 'N/A',
+    //                     'tipo_minimo' => 'N/A',
+    //                 ];
+    //             }
+    
+    //             $impresora = $item['impresora'];
+    //             $contrato = $impresora->contrato;
+    
+    //             return [
+    //                 'serial' => $impresora->serial,
+    //                 'es_reemplazo' => $item['es_reemplazo'] ?? false,
+    //                 'impresora_original_serial' => $item['impresora_original_serial'] ?? null,
+    //                 'contador_inicial' => $item['datos_congelados']['contador_inicial'] ?? $impresora->obtenerUltimoContador(),
+    //                 'contador_final' => $item['datos_congelados']['contador_final'] ?? $impresora->obtenerContadorActual(),
+    //                 'diferencia' => $item['diferencia_total'] ?? 0,
+    //                 'valor_por_copia' => $contrato->valor_por_copia ?? 'N/A',
+    //                 'copias_minimas' => $contrato->tipo_minimo === 'grupal'
+    //                     ? $contrato->copias_minimas
+    //                     : $this->obtenerCopiasMinimasIndividuales($contrato->id, $impresora->id),
+    //                 'tipo_minimo' => $contrato->tipo_minimo ?? 'N/A',
+    //                 'numero_contrato' => $contrato->numero_contrato ?? 'No disponible',
+    //             ];
+    //         }),
     //         'clienteSeleccionado' => $clienteSeleccionado,
     //         'totalCosto' => $totalCosto,
     //         'totalCopias' => $totalCopias,
@@ -124,46 +155,77 @@ class ImpresoraContadorScreen extends Screen
     
         if ($clienteSeleccionado) {
             $impresoras = $this->obtenerImpresorasYReemplazosPorCliente($clienteSeleccionado);
-    
             foreach ($impresoras as $item) {
-                if (!isset($item['impresora'])) {
-                    continue;
-                }
-    
+                $diferenciaTotal = intval($item['diferencia_total']);
+                $contadorInicial = intval($item['contador_inicial']);
+                $contadorFinal = intval($item['contador_final']);
+            
                 $impresora = $item['impresora'];
-                $contadorInicial = $impresora->obtenerUltimoContador();
-                $contadorFinal = $impresora->obtenerContadorActual();
-                $contrato = $impresora->obtenerContratoOriginal();
-    
+                $contrato = $impresora->contrato;
+            
                 if (!$contrato) {
                     continue;
                 }
-    
-                $diferencia = max(0, $contadorFinal - $contadorInicial);
-                $totalCopias += $diferencia;
+            
                 $numeroContrato = $contrato->numero_contrato;
-    
+            
+                // Inicializar datos del contrato si no existen
                 if (!isset($diferenciasPorContrato[$numeroContrato])) {
                     $diferenciasPorContrato[$numeroContrato] = $this->inicializarDatosContrato($contrato);
                     $diferenciasPorContrato[$numeroContrato]['impresoras'] = [];
                 }
-    
+
+          
+                
+            
+                // Determinar las copias mínimas según el tipo de contrato
+                $tipoMinimo = $contrato->tipo_minimo;
+                $valorPorCopia = floatval($contrato->valor_por_copia);
+                $copiasMinimas = 0;
+
+
+                
+            
+                if ($tipoMinimo === 'grupal') {
+                    $copiasMinimas = intval($contrato->copias_minimas ?? 0);
+                } elseif ($tipoMinimo === 'individual') {
+                    $copiasMinimas = $this->obtenerCopiasMinimasIndividuales($contrato->id, $impresora->id);
+                } else {
+                    $copiasMinimas = 0; // Manejar un caso inesperado como valor predeterminado
+                }
+                
+           
+                
+            
+                // Calcular costo dependiendo del tipo de contrato
+                $costoImpresora = 0;
+                if ($tipoMinimo === 'directo') {
+                    $costoImpresora = $diferenciaTotal * $valorPorCopia;
+                } else {
+                    $costoImpresora = ($diferenciaTotal < $copiasMinimas ? $copiasMinimas : $diferenciaTotal) * $valorPorCopia;
+                }
+            
+                // Agregar datos al contrato
                 $diferenciasPorContrato[$numeroContrato]['impresoras'][] = [
                     'id' => $impresora->id,
                     'serial' => $impresora->serial,
                     'contador_inicial' => $contadorInicial,
                     'contador_final' => $contadorFinal,
-                    'diferencia' => $diferencia,
-                    'copias_minimas' => $contrato->copias_minimas ?? 0,
-                    'es_reemplazo' => $item['es_reemplazo'] ?? false,
+                    'diferencia' => $diferenciaTotal,
+                    'valor_por_copia' => $valorPorCopia,
+                    'copias_minimas' => $copiasMinimas, // Revisión del valor aquí
+                    'tipo_minimo' => $tipoMinimo,
+                    'es_reemplazo' => $item['es_reemplazo'],
                     'impresora_original_serial' => $item['impresora_original_serial'] ?? null,
                 ];
-    
-                $diferenciasPorContrato[$numeroContrato]['suma_diferencias'] += $diferencia;
-    
-                if ($contrato->tipo_minimo === 'individual') {
-                    $diferenciasPorContrato[$numeroContrato]['costo_contrato'] += $this->calcularCostoIndividual($impresora, $diferencia, $contrato);
-                }
+            
+                // Sumar diferencias y costos
+                $diferenciasPorContrato[$numeroContrato]['suma_diferencias'] += $diferenciaTotal;
+                $diferenciasPorContrato[$numeroContrato]['costo_contrato'] += $costoImpresora;
+            
+                // Acumular totales generales
+                $totalCopias += $diferenciaTotal;
+                $totalCosto += $costoImpresora;
             }
     
             foreach ($diferenciasPorContrato as &$datosContrato) {
@@ -174,48 +236,101 @@ class ImpresoraContadorScreen extends Screen
                         $datosContrato
                     );
                 }
-                $totalCosto += $datosContrato['costo_contrato'];
-     }
+            }
+    
+          //  Verificar datos finales
+            // dd([
+            //     'diferenciasPorContrato' => $diferenciasPorContrato,
+            //     'totalCopias' => $totalCopias,
+            //     'totalCosto' => $totalCosto,
+            // ]);
+
+
+
+            // dd([
+            //     'contrato' => $contrato->numero_contrato,
+            //     'tipo_minimo' => $tipoMinimo,
+            //     'copias_minimas' => $copiasMinimas,
+            //     'diferencia_total' => $diferenciaTotal,
+            //     'costo_impresora' => $costoImpresora,
+            // ]);
+//            dd($diferenciasPorContrato[$numeroContrato]['impresoras']);
+
+
+
+
         }
-    
-        // Añadimos un dd para depurar la salida
-        dd([
-            'impresoras' => $impresoras->toArray(), // Convierto a array para inspección más clara
-            'clienteSeleccionado' => $clienteSeleccionado,
-            'totalCosto' => $totalCosto,
-            'totalCopias' => $totalCopias,
-            'diferenciasPorContrato' => $diferenciasPorContrato,
-        ]);
-    
-        return [
-            'impresoras' => $impresoras->map(function ($item) {
-                if (!isset($item['impresora'])) {
+
+            return [
+                'impresoras' => $impresoras->map(function ($item) {
+                    if (!isset($item['impresora'])) {
+                        return [
+                            'serial' => '<span class="text-danger">Sin datos</span>',
+                            'contador_inicial' => 0,
+                            'contador_final' => 0,
+                            'diferencia' => 0,
+                            'valor_por_copia' => 0,
+                            'copias_minimas' => 'N/A',
+                            'tipo_minimo' => 'N/A',
+                        ];
+                    }
+            
+                    $impresora = $item['impresora'];
+                    $contrato = $impresora->contrato;
+            
+                    // Determinar las copias mínimas según el tipo de contrato
+                    $copiasMinimas = 'N/A';
+                    if ($contrato) {
+                        if ($contrato->tipo_minimo === 'grupal') {
+                            $copiasMinimas = intval($contrato->copias_minimas ?? 0);
+                        } elseif ($contrato->tipo_minimo === 'individual') {
+                            $copiasMinimas = $this->obtenerCopiasMinimasIndividuales($contrato->id, $impresora->id);
+                        }
+                    }
+            
                     return [
-                        'serial' => '<span class="text-danger">Sin datos</span>',
-                        'contador_inicial' => 0,
-                        'contador_final' => 0,
-                        'diferencia' => 0,
+                        'serial' => $impresora->serial,
+                        'es_reemplazo' => $item['es_reemplazo'] ?? false,
+                        'impresora_original_serial' => $item['impresora_original_serial'] ?? null,
+                        'contador_inicial' => $item['contador_inicial'],
+                        'contador_final' => $item['contador_final'],
+                        'diferencia' => $item['diferencia_total'],
+                        'valor_por_copia' => $contrato->valor_por_copia ?? 'N/A',
+                        'copias_minimas' => $copiasMinimas,
+                        'tipo_minimo' => $contrato->tipo_minimo ?? 'N/A',
+                        'numero_contrato' => $contrato->numero_contrato ?? 'No disponible',
                     ];
-                }
+                }),
+                'clienteSeleccionado' => $clienteSeleccionado,
+                'totalCosto' => $totalCosto,
+                'totalCopias' => $totalCopias,
+                'diferenciasPorContrato' => $diferenciasPorContrato,
+            ];
+        }
+            
     
-                $impresora = $item['impresora'];
-                return [
-                    'serial' => $impresora->serial ?? 'Sin serial',
-                    'es_reemplazo' => $item['es_reemplazo'] ?? false,
-                    'impresora_original_serial' => $item['impresora_original_serial'] ?? null,
-                    'contador_inicial' => $impresora->obtenerUltimoContador(),
-                    'contador_final' => $impresora->obtenerContadorActual(),
-                    'diferencia' => max(0, $impresora->obtenerContadorActual() - $impresora->obtenerUltimoContador()),
-                ];
-            }),
-            'clienteSeleccionado' => $clienteSeleccionado,
-            'totalCosto' => $totalCosto,
-            'totalCopias' => $totalCopias,
-            'diferenciasPorContrato' => $diferenciasPorContrato,
-        ];
-    }
-    
-    
+    private function inicializarDatosContrato($contrato)
+{
+    return [
+        'numero_contrato' => $contrato->numero_contrato,
+        'tipo_minimo' => $contrato->tipo_minimo, // Puede ser 'directo', 'grupal' o 'individual'
+        'valor_por_copia' => floatval($contrato->valor_por_copia),
+        'copias_minimas' => $contrato->copias_minimas ?? 0,
+        'suma_diferencias' => 0,
+        'costo_contrato' => 0,
+    ];
+}
+
+
+private function obtenerCopiasMinimasIndividuales($contratoId, $impresoraId)
+{
+    $contratoImpresora = ContratoImpresora::where('contrato_id', $contratoId)
+        ->where('impresora_id', $impresoraId)
+        ->first();
+    return $contratoImpresora ? intval($contratoImpresora->copias_minimas) : 0;
+}
+
+
     
     private function obtenerContadorInicial(Impresora $impresora)
     {
@@ -246,42 +361,11 @@ class ImpresoraContadorScreen extends Screen
         }
     
         // Si no es un reemplazo, usa el contador actual
-        return $impresora->contador_actual ?? 0;
+        return $reemplazo ? $reemplazo->contador_final : $impresora->contador_actual;
+
     }
-    
-
-    public function guardarFacturacion(Request $request)
-    {
-        $clienteSeleccionado = $this->query()['clienteSeleccionado'];
-        $totalCosto = $this->query()['totalCosto'];
-
-        $factura = Factura::create([
-            'contrato_id' => $clienteSeleccionado,
-            'fecha_factura' => Carbon::now(),
-            'valor_total' => $totalCosto,
-        ]);
-
-        foreach ($this->query()['diferenciasPorContrato'] as $contrato) {
-            foreach ($contrato['impresoras'] as $impresora) {
-                FacturaDetalle::create([
-                    'factura_id' => $factura->id,
-                    'contrato_id' => $clienteSeleccionado,
-                    'impresora_id' => $impresora['id'],
-                    'diferencia_copias' => $impresora['diferencia'],
-                    'copias_minimas' => $impresora['copias_minimas'],
-                    'costo_por_copia' => $contrato['valor_por_copia'],
-                    'costo_calculado' => $impresora['costo_calculado'],
-                ]);
-            }
-        }
-
-        return redirect()->route('platform.impresoras_contador')
-            ->with('success', 'La facturación se ha confirmado y guardado correctamente.');
-    }
-
     private function obtenerImpresorasYReemplazosPorCliente($clienteId)
     {
-        // Obtén impresoras activas del cliente con la relación contrato
         $impresoras = Impresora::with('contrato')
             ->whereHas('contrato', function ($query) use ($clienteId) {
                 $query->where('cliente_id', $clienteId);
@@ -290,71 +374,70 @@ class ImpresoraContadorScreen extends Screen
     
         $idsImpresoras = $impresoras->pluck('id');
     
-        // Obtén reemplazos relacionados con estas impresoras activas
         $reemplazos = Reemplazo::whereIn('id_impresora_reemplazo', $idsImpresoras)
             ->orWhereIn('id_impresora_original', $idsImpresoras)
             ->get();
     
-        // Colección para almacenar todas las impresoras con su estado y datos congelados
         $impresorasConReemplazos = collect();
     
         foreach ($impresoras as $impresora) {
-            // Verifica si la impresora está en la tabla Reemplazo como reemplazo
-            $reemplazo = $reemplazos->firstWhere('id_impresora_reemplazo', $impresora->id);
+            $esReemplazo = false;
+            $contadorFinal = intval($impresora->contador_actual ?? 0);
+            $contadorInicial = 0;
     
-            if ($reemplazo) {
-                // Si la impresora es un reemplazo, usar los datos de la impresora original
-                $impresoraOriginal = Impresora::with('contrato')->find($reemplazo->id_impresora_original);
+            $reemplazoAsociado = $reemplazos->where('id_impresora_reemplazo', $impresora->id)->last();
     
-                $impresorasConReemplazos->push([
-                    'impresora' => $impresoraOriginal ?? $impresora,
-                    'es_reemplazo' => true,
-                    'impresora_original_serial' => $impresoraOriginal->serial ?? null,
-                    'datos_congelados' => [
-                        'contador_inicial' => $reemplazo->contador_inicial,
-                        'contador_final' => $reemplazo->contador_final,
-                    ],
-                ]);
+            if ($reemplazoAsociado) {
+                $contadorInicial = intval($reemplazoAsociado->contador_final ?? 0);
             } else {
-                // Si no es reemplazo, mostrar la impresora tal cual
-                $impresorasConReemplazos->push([
-                    'impresora' => $impresora,
-                    'es_reemplazo' => false,
-                    'impresora_original_serial' => null,
-                    'datos_congelados' => null,
-                ]);
+                $contadorInicial = intval($impresora->obtenerUltimoContador() ?? 0);
             }
+    
+            // Garantizar que el cálculo no sea negativo
+            if ($contadorFinal < $contadorInicial) {
+                $temp = $contadorFinal;
+                $contadorFinal = $contadorInicial;
+                $contadorInicial = $temp;
+            }
+    
+            // Calcular diferencia
+            $diferenciaTotal = $contadorFinal - $contadorInicial;
+    
+            $impresorasConReemplazos->push([
+                'impresora' => $impresora,
+                'es_reemplazo' => $esReemplazo,
+                'contador_inicial' => $contadorInicial,
+                'contador_final' => $contadorFinal,
+                'diferencia_total' => $diferenciaTotal,
+                'contrato' => $impresora->contrato,
+            ]);
         }
     
         return $impresorasConReemplazos;
     }
     
-
     
-    private function inicializarDatosContrato($contrato)
-    {
-        return [
-            'numero_contrato' => $contrato->numero_contrato,
-            'tipo_minimo' => $contrato->tipo_minimo,
-            'valor_por_copia' => $contrato->valor_por_copia,
-            'copias_minimas' => $contrato->copias_minimas,
-            'suma_diferencias' => 0,
-            'costo_contrato' => 0,
-        ];
-    }
     
-    private function calcularCostoIndividual(Impresora $impresora, $diferencia, $contrato)
-    {
-        $contratoImpresora = ContratoImpresora::where('contrato_id', $contrato->id)
-            ->where('impresora_id', $impresora->id)
-            ->first();
+    // private function calcularCostoIndividual(Impresora $impresora, $diferencia, $contrato)
+    // {
+    //     $contratoImpresora = ContratoImpresora::where('contrato_id', $contrato->id)
+    //         ->where('impresora_id', $impresora->id)
+    //         ->first();
 
-        $copiasMinimas = $contratoImpresora ? $contratoImpresora->copias_minimas : 0;
+    //     $copiasMinimas = $contratoImpresora ? $contratoImpresora->copias_minimas : 0;
 
-        return $diferencia < $copiasMinimas
-            ? $copiasMinimas * $contrato->valor_por_copia
-            : $diferencia * $contrato->valor_por_copia;
-    }
+    //     return $diferencia < $copiasMinimas
+    //         ? $copiasMinimas * $contrato->valor_por_copia
+    //         : $diferencia * $contrato->valor_por_copia;
+    // }
+
+    private function calcularCostoIndividual($diferencia, $copiasMinimas, $valorPorCopia)
+{
+    return $diferencia < $copiasMinimas
+        ? $copiasMinimas * $valorPorCopia
+        : $diferencia * $valorPorCopia;
+}
+
 
     private function calcularCostoDirecto(Impresora $impresora, $diferencia, $contrato)
     {
@@ -375,7 +458,6 @@ class ImpresoraContadorScreen extends Screen
             ? $minimoGrupal * $datos['valor_por_copia']
             : $sumaDiferencias * $datos['valor_por_copia'];
     }
-    
     public function layout(): array
     {
         $layout = [
@@ -386,41 +468,72 @@ class ImpresoraContadorScreen extends Screen
                     ->title('Selecciona un Cliente')
                     ->help('Este filtro muestra las impresoras del cliente seleccionado')
                     ->value(request('cliente_id') ?? $this->query()['clienteSeleccionado']),
-
+    
                 Button::make('Confirmar Selección')
                     ->icon('check')
                     ->method('actualizarPagina')
                     ->style('background-color: #28a745; color: white;'),
             ]),
-
+    
             ImpresoraContadorLayout::class,
         ];
-
+    
         foreach ($this->query()['diferenciasPorContrato'] as $contrato) {
+            $impresoras = $contrato['impresoras'];
+            $cumplenMinimo = 0;
+    
+            foreach ($impresoras as $impresora) {
+                if ($impresora['diferencia'] >= $impresora['copias_minimas']) {
+                    $cumplenMinimo++;
+                }
+            }
+    
+            $totalImpresoras = count($impresoras);
+            $mensajeCumplimiento = $contrato['tipo_minimo'] === 'individual'
+                ? "$cumplenMinimo/$totalImpresoras impresoras cumplen con el mínimo establecido."
+                : null;
+    
+            $cumpleContrato = true;
+            foreach ($impresoras as $impresora) {
+                if ($impresora['diferencia'] < $impresora['copias_minimas']) {
+                    $cumpleContrato = false;
+                    break;
+                }
+            }
+    
+            $cumpleMensaje = $cumpleContrato
+                ? 'Cumple con el mínimo de copias.'
+                : 'No cumple con el mínimo de copias.';
+            $cumpleColor = $cumpleContrato ? '#28a745' : '#E74C3C'; // Verde si cumple, rojo si no cumple
+    
             $rows = [
                 Label::make('contrato_' . $contrato['numero_contrato'])
                     ->value('Contrato: ' . $contrato['numero_contrato'] 
                             . ' - Tipo de Contrato: ' . ucfirst($contrato['tipo_minimo']))
                     ->style('font-weight: bold; font-size: 16px; color: #2C3E50; margin-top: 10px;'),
-
+    
                 Label::make('detalleContrato_' . $contrato['numero_contrato'])
                     ->value($contrato['tipo_minimo'] === 'individual' 
                             ? 'Copias Totales: ' . number_format($contrato['suma_diferencias'], 0, '', '.') 
                               . ' - Costo Total del Contrato: $' . number_format($contrato['costo_contrato'], 0, '', '.')
-                            : 'Diferencia Total (para mínimo grupal): ' . number_format($contrato['suma_diferencias'], 0, '', '.')
+                            : 'Diferencia Copias Total: ' . number_format($contrato['suma_diferencias'], 0, '', '.')
                               . ' - Costo: $' . number_format($contrato['costo_contrato'], 0, '', '.'))
                     ->style('margin-top: 5px; color: #34495E;'),
+    
+                Label::make('estadoContrato_' . $contrato['numero_contrato'])
+                    ->value($cumpleMensaje)
+                    ->style('font-style: italic; color: ' . $cumpleColor . '; margin-top: 5px;'),
             ];
-
-            if ($contrato['tipo_minimo'] === 'individual' && $contrato['suma_diferencias'] < $contrato['copias_minimas']) {
-                $rows[] = Label::make('notaMinimo_' . $contrato['numero_contrato'])
-                    ->value('* El costo se basa en el mínimo de copias establecido en el contrato.')
-                    ->style('font-style: italic; color: #E74C3C;');
+    
+            if ($mensajeCumplimiento) {
+                $rows[] = Label::make('mensajeCumplimiento_' . $contrato['numero_contrato'])
+                    ->value($mensajeCumplimiento)
+                    ->style('font-weight: bold; color: #34495E; margin-top: 10px;');
             }
-
+    
             $layout[] = Layout::rows($rows)->title('Detalles del Contrato ' . $contrato['numero_contrato']);
         }
-
+    
         $layout[] = Layout::rows([
             Label::make('totalCosto')
                 ->value(function () {
@@ -431,7 +544,7 @@ class ImpresoraContadorScreen extends Screen
                 })
                 ->title('Resumen Costo Total')
                 ->style('font-weight: bold; font-size: 18px; margin-top: 20px; color: #2C3E50;'),
-
+    
             Label::make('totalCopias')
                 ->value(function () {
                     $totalCopias = $this->query()['totalCopias'];
@@ -440,7 +553,7 @@ class ImpresoraContadorScreen extends Screen
                 ->title('Resumen Total de Copias')
                 ->style('font-weight: bold; font-size: 18px; color: #34495E; margin-top: 5px;'),
         ]);
-
+    
         $layout[] = Layout::rows([
             Button::make('Confirmar Facturación')
                 ->icon('check')
@@ -448,10 +561,11 @@ class ImpresoraContadorScreen extends Screen
                 ->style('background-color: #007bff; color: white; margin-top: 20px;')
                 ->confirm('¿Estás seguro de que deseas confirmar la facturación? Esto guardará los datos en el sistema.')
         ]);
-
+    
         return $layout;
     }
-
+    
+    
     public function actualizarPagina(Request $request)
     {
         $clienteSeleccionado = $request->get('cliente_id');

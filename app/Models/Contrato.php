@@ -63,4 +63,16 @@ class Contrato extends Model
     {
         return $query->where('tipo_minimo', 'individual');
     }
+
+    public function calcularDiferenciaContrato()
+{
+    $diferenciaContrato = 0;
+
+    foreach ($this->impresoras as $impresora) {
+        $diferenciaContrato += $impresora->calcularDiferenciaTotal();
+    }
+
+    return $diferenciaContrato;
+}
+
 }

@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 
+
+// Redirigir la raíz (/) a /admin
 Route::get('/', function () {
-    return view('welcome');
+    return redirect('/admin');
 });

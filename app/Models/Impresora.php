@@ -284,5 +284,26 @@ public function obtenerEstadoActual()
     return 'Disponible';
 }
 
+public function calcularDiferenciaTotal()
+{
+    $diferenciaTotal = 0;
+
+    // 1. Diferencia de reemplazos anteriores
+    foreach ($this->reemplazos as $reemplazo) {
+        $diferenciaReemplazo = max(0, ($reemplazo->contador_final ?? 0) - ($reemplazo->contador_inicial ?? 0));
+        $diferenciaTotal += $diferenciaReemplazo;
+    }
+
+    // 2. Diferencia de la impresora actual
+    $contadorInicial = $this->historialContadores()->oldest()->value('contador') ?? 0;
+    $contadorFinal = $this->historialContadores()->latest()->value('contador') ?? $this->contador_actual;
+
+    $diferenciaActual = max(0, $contadorFinal - $contadorInicial);
+    $diferenciaTotal += $diferenciaActual;
+
+    return $diferenciaTotal;
+}
+
+
 
 }
