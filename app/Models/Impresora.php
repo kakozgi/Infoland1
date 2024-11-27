@@ -136,36 +136,44 @@ class Impresora extends Model
     // }
     
     public function ultimoHistorial()
-{
-    $fechaReferencia = now()->subMonth(); // Comienza un mes antes del actual
+    {
+        $fechaReferencia = now()->subMonth(); // Comienza un mes antes del actual
+    
+        // Retrocede mes a mes para encontrar el historial más reciente antes del mes actual
+        while ($fechaReferencia->year >= 2000) {
+            $ultimoHistorialMesAnterior = $this->historialContadores()
+                ->whereYear('fecha_registro', $fechaReferencia->year)
+                ->whereMonth('fecha_registro', $fechaReferencia->month)
+                ->orderBy('fecha_registro', 'desc')
+                ->orderBy('created_at', 'desc')
+                ->first();
+    
+            if ($ultimoHistorialMesAnterior) {
 
-    // Retrocede mes a mes para encontrar el historial más reciente antes del mes actual
-    while ($fechaReferencia->year >= 2000) {
-        $ultimoHistorialMesAnterior = $this->historialContadores()
-            ->whereYear('fecha_registro', $fechaReferencia->year)
-            ->whereMonth('fecha_registro', $fechaReferencia->month)
-            ->orderBy('fecha_registro', 'desc')
-            ->orderBy('created_at', 'desc') // Asegura el último registro dentro del mes
+
+                // dd([
+                //     'serial' => $this->serial,
+                //     'tipo_busqueda' => 'Mes anterior',
+                //     'fecha_referencia' => $fechaReferencia->format('Y-m'),
+                //     'ultimo_historial_encontrado' => $ultimoHistorialMesAnterior,
+                // ]);
+            
+                return $ultimoHistorialMesAnterior; // Devuelve el último historial antes del mes actual
+            }
+    
+            $fechaReferencia->subMonth(); // Retrocede un mes
+        }
+    
+        // Si no se encuentra un historial previo, usa el más reciente disponible
+        $primerHistorial = $this->historialContadores()
+            ->orderBy('fecha_registro', 'asc')
             ->first();
 
-        // Si encuentra un historial en el mes actual de búsqueda, devolver ese último historial
-        if ($ultimoHistorialMesAnterior) {
-            return $ultimoHistorialMesAnterior;
-        }
-
-        // Retrocede un mes si no se encuentra historial en el mes actual de búsqueda
-        $fechaReferencia->subMonth();
+        return $primerHistorial; // Puede ser nulo si no hay registros
+        
     }
-
-    // Si no se encuentra ningún historial en meses anteriores, toma el primer registro absoluto de la impresora
-    $primerHistorial = $this->historialContadores()
-        ->orderBy('fecha_registro', 'asc')
-        ->orderBy('created_at', 'asc')
-        ->first();
-
-    // Si existe un registro en absoluto, úsalo como último historial
-    return $primerHistorial ?: null; // Retorna null si no existe ningún registro en la tabla
-}
+    
+    
 
 /**
  * Obtiene el contador actual considerando si fue reemplazada.
@@ -191,16 +199,38 @@ public function obtenerContadorActual()
  */
 public function obtenerUltimoContador()
 {
+    // Verificar si esta impresora ha sido reemplazada por otra
     $reemplazo = $this->reemplazo()->latest()->first();
 
     if ($reemplazo) {
-        // Si esta impresora es reemplazada, usa su contador inicial
-        return $reemplazo->contador_inicial ?? 0;
+        // Validar si el reemplazo está relacionado con el contrato actual
+        if ($reemplazo->numero_contrato == $this->contrato_id) {
+            // Si pertenece al contrato actual, usa su contador inicial
+            return $reemplazo->contador_inicial ?? 0;
+        }
+
+        // Si no pertenece al contrato actual, verifica si tiene un historial asociado
+        $ultimoHistorial = $this->ultimoHistorial();
+        if ($ultimoHistorial) {
+            return intval($ultimoHistorial->contador);
+        }
+
+        // Si no hay historial, usa el contador actual del reemplazo
+        return intval($this->contador_actual ?? 0);
+    }
+    // Si no es reemplazo, buscar el último historial registrado
+    $ultimoHistorial = $this->ultimoHistorial();
+    if ($ultimoHistorial) {
+        return intval($ultimoHistorial->contador);
     }
 
-    // Si no hay reemplazo, usa el último historial registrado
-    return $this->ultimoHistorial()->contador ?? 0;
+    // Si no hay historial, usar el contador actual como fallback
+    return intval($this->contador_actual ?? 0);
 }
+
+
+
+
 
 
 
@@ -262,8 +292,10 @@ public function obtenerContratoOriginal()
         return $reemplazo->impresoraOriginal->contrato;
     }
 
+    // Si no hay reemplazo, devolver el contrato actual
     return $this->contrato;
 }
+
 /**
  * Obtiene el estado actual de la impresora.
  *

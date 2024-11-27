@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('impresoras', function (Blueprint $table) {
             $table->id();  // id bigint, clave primaria, auto incremento
             $table->string('serial', 50)->unique();
-            $table->foreignId('id_modelo')->constrained('modelos_impresoras');  // Relación con modelos_impresoras
+            $table->foreignId('id_modelo')->constrained('modelo_impresoras');  // Relación con modelos_impresoras
             $table->enum('estado', ['contrato', 'disponible', 'servicio_tecnico', 'desarme', 'recambio'])->default('disponible');
             $table->foreignId('contrato_id')->nullable()->constrained('contratos');  // Relación opcional con contratos
             $table->string('ubicacion', 255);
